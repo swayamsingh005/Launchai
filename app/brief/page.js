@@ -31,9 +31,19 @@ export default function Brief() {
 
   const handleApprove = async () => {
     setApproving(true);
-    const supabase = createClient();
-    await supabase.from("briefs").update({ status: "approved" }).eq("id", brief.id);
-    router.push("/dashboard");
+    try {
+      const supabase = createClient();
+      await supabase.from("briefs")
+        .update({ status: "approved" })
+        .eq("id", brief.id);
+      await supabase.from("clients")
+        .update({ status: "active" })
+        .eq("user_id", brief.user_id);
+      router.push("/client-dashboard");
+    } catch (err) {
+      alert("Something went wrong. Try again.");
+      setApproving(false);
+    }
   };
 
   const handleChanges = () => router.push("/onboarding");
@@ -117,7 +127,7 @@ export default function Brief() {
 
         .note { font-size: 0.78rem; color: #4b5563; text-align: center; margin-top: 1rem; }
 
-        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } .page { padding: 2rem 1rem; } }
       `}</style>
 
       <div className="bg-glow" />
