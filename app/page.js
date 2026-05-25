@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "../lib/supabase";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -8,6 +10,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [mouseX, setMouseX] = useState(0);
   const [mouseY, setMouseY] = useState(0);
+  const router = useRouter();
 
   useEffect(() => {
     const move = (e) => { setMouseX(e.clientX); setMouseY(e.clientY); };
@@ -18,9 +21,26 @@ export default function Home() {
   const handleWaitlist = async (e) => {
     e.preventDefault();
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setSubmitted(true);
-    setLoading(false);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("waitlist")
+        .insert([{ name, email }]);
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err) {
+      if (err.code === "23505") {
+        alert("This email is already on the waitlist!");
+      } else {
+        alert("Something went wrong. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const scrollToWaitlist = () => {
+    document.getElementById("waitlist-form")?.scrollIntoView({ behavior: "smooth" });
   };
 
   const agents = [
@@ -53,7 +73,6 @@ export default function Home() {
         html { scroll-behavior: smooth; }
         body { background: #050312; color: #f0eeff; font-family: 'Inter', sans-serif; overflow-x: hidden; }
 
-        /* CURSOR GLOW */
         .cursor-glow {
           position: fixed; pointer-events: none; z-index: 999;
           width: 400px; height: 400px; border-radius: 50%;
@@ -71,6 +90,15 @@ export default function Home() {
         }
         .logo { font-family: 'Bebas Neue', cursive; font-size: 1.9rem; letter-spacing: 0.06em; color: #fff; }
         .logo em { color: #a78bfa; font-style: normal; }
+        .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+        .nav-signin {
+          background: transparent; color: #a78bfa;
+          border: 1px solid rgba(124,58,237,0.4);
+          padding: 0.5rem 1.25rem; border-radius: 100px;
+          font-size: 0.85rem; font-weight: 500; cursor: pointer;
+          font-family: 'Inter', sans-serif; transition: all 0.2s;
+        }
+        .nav-signin:hover { background: rgba(124,58,237,0.1); border-color: #7c3aed; }
         .nav-cta {
           background: linear-gradient(135deg, #7c3aed, #5b21b6);
           color: #fff; border: none; padding: 0.55rem 1.5rem;
@@ -87,8 +115,6 @@ export default function Home() {
           justify-content: center; text-align: center;
           padding: 6rem 1.5rem 4rem; overflow: hidden;
         }
-
-        /* BG GRID */
         .hero::before {
           content: '';
           position: absolute; inset: 0;
@@ -98,8 +124,6 @@ export default function Home() {
           background-size: 60px 60px;
           mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
         }
-
-        /* GLOWS */
         .hero-glow1 {
           position: absolute; width: 900px; height: 600px; border-radius: 50%;
           background: radial-gradient(circle, rgba(109,40,217,0.35) 0%, transparent 65%);
@@ -115,8 +139,6 @@ export default function Home() {
           background: radial-gradient(circle, rgba(167,139,250,0.15) 0%, transparent 65%);
           bottom: 0; right: -50px; pointer-events: none;
         }
-
-        /* 3D ORBS */
         .orb {
           position: absolute; border-radius: 50%; pointer-events: none;
           animation: float 6s ease-in-out infinite;
@@ -150,8 +172,6 @@ export default function Home() {
           33% { transform: translateY(-18px) rotate(3deg); }
           66% { transform: translateY(-8px) rotate(-2deg); }
         }
-
-        /* RING */
         .hero-ring {
           position: absolute; border-radius: 50%; pointer-events: none;
           border: 1px solid rgba(124,58,237,0.2); animation: spin 20s linear infinite;
@@ -161,7 +181,6 @@ export default function Home() {
         @keyframes spin { from { transform: translate(-50%,-50%) rotate(0deg); } to { transform: translate(-50%,-50%) rotate(360deg); } }
 
         .hero-content { position: relative; z-index: 2; }
-
         .badge {
           display: inline-flex; align-items: center; gap: 0.5rem;
           background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.3);
@@ -183,7 +202,6 @@ export default function Home() {
           color: #a78bfa;
           text-shadow: 0 0 60px rgba(167,139,250,0.6), 0 0 120px rgba(124,58,237,0.3);
         }
-
         .hero-p {
           font-size: 1.05rem; color: #9ca3af; max-width: 500px;
           margin: 0 auto 3rem; line-height: 1.8; font-weight: 400;
@@ -213,6 +231,15 @@ export default function Home() {
         }
         .success h3 { font-family: 'Bebas Neue', cursive; font-size: 1.8rem; color: #c4b5fd; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
         .success p { color: #9ca3af; font-size: 0.9rem; }
+        .success-login {
+          margin-top: 1.25rem;
+          background: linear-gradient(135deg, #7c3aed, #5b21b6);
+          color: #fff; border: none; padding: 0.75rem 1.75rem;
+          border-radius: 100px; font-size: 0.88rem; font-weight: 600;
+          cursor: pointer; font-family: 'Inter', sans-serif;
+          box-shadow: 0 4px 20px rgba(124,58,237,0.35); transition: all 0.2s;
+        }
+        .success-login:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(124,58,237,0.5); }
 
         .stats { display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; }
         .stat { text-align: center; }
@@ -246,13 +273,9 @@ export default function Home() {
         .step-t { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.6rem; color: #fff; }
         .step-d { color: #9ca3af; font-size: 0.88rem; line-height: 1.7; }
 
-        /* AGENTS — 2 COLUMN GRID */
+        /* AGENTS */
         .agents-wrap { margin-top: 3.5rem; }
-        .agents-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 1rem;
-        }
+        .agents-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .agent {
           background: rgba(255,255,255,0.025);
           border: 1px solid rgba(255,255,255,0.07);
@@ -272,8 +295,7 @@ export default function Home() {
           background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(76,29,149,0.3));
           border: 1px solid rgba(124,58,237,0.3);
           display: flex; align-items: center; justify-content: center; font-size: 1.15rem;
-          box-shadow: 0 4px 12px rgba(124,58,237,0.2);
-          position: relative; z-index: 1;
+          box-shadow: 0 4px 12px rgba(124,58,237,0.2); position: relative; z-index: 1;
         }
         .a-name { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.25rem; color: #e9d5ff; position: relative; z-index: 1; }
         .a-desc { color: #6b7280; font-size: 0.8rem; line-height: 1.5; position: relative; z-index: 1; }
@@ -318,6 +340,12 @@ export default function Home() {
         .f-logo { font-family: 'Bebas Neue', cursive; font-size: 1.4rem; letter-spacing: 0.06em; }
         .f-logo em { color: #a78bfa; font-style: normal; }
         .f-copy { font-size: 0.78rem; color: #374151; }
+        .f-signin {
+          background: transparent; color: #a78bfa; border: 1px solid rgba(124,58,237,0.3);
+          padding: 0.4rem 1rem; border-radius: 100px; font-size: 0.78rem;
+          cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s;
+        }
+        .f-signin:hover { background: rgba(124,58,237,0.1); }
 
         @media (max-width: 600px) {
           .agents-grid { grid-template-columns: 1fr; }
@@ -333,7 +361,10 @@ export default function Home() {
       {/* NAV */}
       <nav className="nav">
         <div className="logo">Launch<em>AI</em></div>
-        <button className="nav-cta">Join Waitlist →</button>
+        <div className="nav-right">
+          <button className="nav-signin" onClick={() => router.push("/login")}>Sign In</button>
+          <button className="nav-cta" onClick={scrollToWaitlist}>Join Waitlist →</button>
+        </div>
       </nav>
 
       {/* HERO */}
@@ -347,19 +378,24 @@ export default function Home() {
           <h1 className="h1">Idea In.<br /><span className="purple">Company Out.</span></h1>
           <p className="hero-p">Describe your business idea. Our 12 AI agents build your product, launch it, and run it every day — marketing, sales, support and all. You just say yes or no.</p>
 
-          {submitted ? (
-            <div className="success">
-              <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🚀</div>
-              <h3>You're on the list!</h3>
-              <p>We'll reach out with early access soon. Welcome to the future of business.</p>
-            </div>
-          ) : (
-            <form className="form" onSubmit={handleWaitlist}>
-              <input className="inp" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} required />
-              <input className="inp" type="email" placeholder="Your email address" value={email} onChange={e => setEmail(e.target.value)} required />
-              <button className="btn" type="submit" disabled={loading}>{loading ? "Joining..." : "Get Early Access →"}</button>
-            </form>
-          )}
+          <div id="waitlist-form">
+            {submitted ? (
+              <div className="success">
+                <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🚀</div>
+                <h3>You're on the list!</h3>
+                <p>We'll reach out with early access soon. Welcome to the future of business.</p>
+                <button className="success-login" onClick={() => router.push("/login")}>
+                  Sign In to Your Account →
+                </button>
+              </div>
+            ) : (
+              <form className="form" onSubmit={handleWaitlist}>
+                <input className="inp" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} required />
+                <input className="inp" type="email" placeholder="Your email address" value={email} onChange={e => setEmail(e.target.value)} required />
+                <button className="btn" type="submit" disabled={loading}>{loading ? "Joining..." : "Get Early Access →"}</button>
+              </form>
+            )}
+          </div>
 
           <div className="stats">
             {[["48H", "To build your product"], ["12", "AI agents working"], ["0", "Employees needed"], ["₹0", "Salary cost ever"]].map(([n, l]) => (
@@ -392,7 +428,7 @@ export default function Home() {
 
       <div className="sep" />
 
-      {/* AGENTS — 2 COLUMN */}
+      {/* AGENTS */}
       <div className="sec">
         <p className="tag">Your AI team</p>
         <h2 className="sec-h">12 agents.<br />Zero salaries.</h2>
@@ -439,7 +475,9 @@ export default function Home() {
                 </li>
               ))}
             </ul>
-            <button className="btn" style={{ width: "100%", position: "relative", zIndex: 1 }}>Join the Waitlist →</button>
+            <button className="btn" style={{ width: "100%", position: "relative", zIndex: 1 }} onClick={scrollToWaitlist}>
+              Join the Waitlist →
+            </button>
           </div>
         </div>
       </div>
@@ -448,6 +486,7 @@ export default function Home() {
       <footer className="footer">
         <div className="f-logo">Launch<em>AI</em></div>
         <div className="f-copy">© 2026 LaunchAI · Built by AI. Run by AI.</div>
+        <button className="f-signin" onClick={() => router.push("/login")}>Sign In →</button>
       </footer>
     </>
   );
