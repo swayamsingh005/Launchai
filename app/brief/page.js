@@ -36,9 +36,6 @@ export default function Brief() {
       await supabase.from("briefs")
         .update({ status: "approved" })
         .eq("id", brief.id);
-      await supabase.from("clients")
-        .update({ status: "active" })
-        .eq("user_id", brief.user_id);
       router.push("/payment");
     } catch (err) {
       alert("Something went wrong. Try again.");
@@ -189,7 +186,7 @@ export default function Brief() {
                 {approving ? "Approving..." : "Approve & Continue →"}
               </button>
             </div>
-            <div className="note">Approving this brief will activate your 12 AI agents</div>
+            <div className="note">Approving this brief will take you to payment</div>
           </div>
         </div>
       </div>
