@@ -39,7 +39,7 @@ export default function Brief() {
       await supabase.from("clients")
         .update({ status: "active" })
         .eq("user_id", brief.user_id);
-      router.push("/client-dashboard");
+      router.push("/payment");
     } catch (err) {
       alert("Something went wrong. Try again.");
       setApproving(false);
