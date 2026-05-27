@@ -33,17 +33,26 @@ export async function POST(request) {
       return NextResponse.json({ error: "Invalid payment signature" }, { status: 400 });
     }
 
-    // Update client status to active
-    const { error: clientError } = await supabase
+    // Update client with payment info
+    const { data: client, error: clientError } = await supabase
       .from("clients")
       .update({
-        status: "active",
         payment_id: razorpay_payment_id,
         order_id: razorpay_order_id,
       })
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .select()
+      .single();
 
     if (clientError) throw clientError;
+
+    // Trigger Strategy Agent
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://launchai-vert.vercel.app";
+    fetch(`${baseUrl}/api/strategy-agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Cookie": request.headers.get("cookie") || "" },
+      body: JSON.stringify({ client_id: client.id }),
+    }).catch(err => console.error("Strategy agent trigger error:", err));
 
     return NextResponse.json({ success: true });
   } catch (err) {

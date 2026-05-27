@@ -34,7 +34,8 @@ export async function middleware(request) {
       pathname.startsWith("/onboarding") ||
       pathname.startsWith("/brief") ||
       pathname.startsWith("/client-dashboard") ||
-      pathname.startsWith("/payment")
+      pathname.startsWith("/payment") ||
+      pathname.startsWith("/strategy")
     ) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -46,7 +47,6 @@ export async function middleware(request) {
   // ─── LOGGED IN → SKIP LOGIN PAGE ─────────────────
   if (pathname === "/login") {
     if (isAdmin) return NextResponse.redirect(new URL("/dashboard", request.url));
-    // client → check where they are in the flow
     const { data: client } = await supabase
       .from("clients")
       .select("id, status")
@@ -60,7 +60,6 @@ export async function middleware(request) {
   // ─── ADMIN ROUTES ─────────────────────────────────
   if (pathname.startsWith("/dashboard")) {
     if (!isAdmin) {
-      // non-admin trying to access founder dashboard → redirect them
       const { data: client } = await supabase
         .from("clients")
         .select("id, status")
@@ -96,18 +95,6 @@ export async function middleware(request) {
     return response;
   }
 
-  if (pathname.startsWith("/client-dashboard")) {
-    if (isAdmin) return NextResponse.redirect(new URL("/dashboard", request.url));
-    const { data: client } = await supabase
-      .from("clients")
-      .select("id, status")
-      .eq("user_id", user.id)
-      .single();
-    if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
-    if (client.status !== "active") return NextResponse.redirect(new URL("/brief", request.url));
-    return response;
-  }
-
   if (pathname.startsWith("/payment")) {
     if (isAdmin) return NextResponse.redirect(new URL("/dashboard", request.url));
     const { data: client } = await supabase
@@ -117,6 +104,29 @@ export async function middleware(request) {
       .single();
     if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
     if (client.status === "active") return NextResponse.redirect(new URL("/client-dashboard", request.url));
+    return response;
+  }
+
+  if (pathname.startsWith("/strategy")) {
+    if (isAdmin) return NextResponse.redirect(new URL("/dashboard", request.url));
+    const { data: client } = await supabase
+      .from("clients")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .single();
+    if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
+    return response;
+  }
+
+  if (pathname.startsWith("/client-dashboard")) {
+    if (isAdmin) return NextResponse.redirect(new URL("/dashboard", request.url));
+    const { data: client } = await supabase
+      .from("clients")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .single();
+    if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
+    if (client.status !== "active") return NextResponse.redirect(new URL("/strategy", request.url));
     return response;
   }
 
@@ -130,6 +140,7 @@ export const config = {
     "/brief/:path*",
     "/client-dashboard/:path*",
     "/payment/:path*",
+    "/strategy/:path*",
     "/login"
   ],
 };
