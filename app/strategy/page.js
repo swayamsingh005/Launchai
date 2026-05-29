@@ -28,7 +28,6 @@ export default function Strategy() {
         .single();
 
       if (!data) {
-        // No strategy yet — generate one
         setGenerating(true);
         const { data: client } = await supabase
           .from("clients")
@@ -60,12 +59,27 @@ export default function Strategy() {
     setApproving(true);
     try {
       const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Update strategy status
       await supabase.from("strategies")
         .update({ status: "approved" })
         .eq("id", strategy.id);
+
+      // Update client status to active
       await supabase.from("clients")
         .update({ status: "active" })
         .eq("user_id", strategy.user_id);
+
+      // Create founder decision notifying about strategy approval
+      await supabase.from("founder_decisions").insert([{
+        title: "Strategy approved by client",
+        description: `${user.email} has approved their 30-day launch strategy. Their 12 AI agents are now fully activated and working.`,
+        priority: "medium",
+        client_email: user.email,
+        status: "pending"
+      }]);
+
       router.push("/client-dashboard");
     } catch (err) {
       alert("Something went wrong. Try again.");
@@ -193,32 +207,25 @@ export default function Strategy() {
             <div className="hero-sub">Strategy Agent has built your complete go-to-market plan. Review and approve to activate your agents.</div>
           </div>
 
-          {/* Launch Plan */}
           <div className="section">
             <div className="section-label">🚀 Launch Plan</div>
             <div className="section-text">{strategy.launch_plan}</div>
           </div>
 
-          {/* Pricing Strategy */}
           <div className="section">
             <div className="section-label">💰 Pricing Strategy</div>
             <div className="section-text">{strategy.pricing_strategy}</div>
           </div>
 
-          {/* Marketing Channels */}
           <div className="section">
             <div className="section-label">📣 Marketing Channels</div>
             <div className="channels">
               {(strategy.marketing_channels || []).map((c, i) => (
-                <div className="channel" key={i}>
-                  <div className="channel-dot" />
-                  {c}
-                </div>
+                <div className="channel" key={i}><div className="channel-dot" />{c}</div>
               ))}
             </div>
           </div>
 
-          {/* Weekly Roadmap */}
           <div className="section">
             <div className="section-label">📅 30-Day Roadmap</div>
             <div className="roadmap">
@@ -235,7 +242,6 @@ export default function Strategy() {
             </div>
           </div>
 
-          {/* Decisions */}
           <div className="section">
             <div className="section-label">⚡ Decisions Queued For You</div>
             <div className="decisions">
@@ -248,7 +254,6 @@ export default function Strategy() {
             </div>
           </div>
 
-          {/* Buttons */}
           <div className="btn-row">
             <button className="btn-changes" onClick={() => setShowFeedback(!showFeedback)}>
               Request Changes
@@ -258,7 +263,6 @@ export default function Strategy() {
             </button>
           </div>
 
-          {/* Feedback Box */}
           {showFeedback && (
             <div className="feedback-box">
               <div className="feedback-label">Tell Strategy Agent what to change:</div>

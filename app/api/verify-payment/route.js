@@ -46,6 +46,24 @@ export async function POST(request) {
 
     if (clientError) throw clientError;
 
+    // Auto-create founder decisions for this new client
+    await supabase.from("founder_decisions").insert([
+      {
+        title: "New client activated",
+        description: `${user.email} has paid ₹30,000 and activated their account. Their Strategy Agent is now running. Review their onboarding?`,
+        priority: "high",
+        client_email: user.email,
+        status: "pending"
+      },
+      {
+        title: "Strategy Agent running",
+        description: `Strategy Agent is generating a 30-day GTM plan for ${user.email}. You'll be notified once they approve their strategy.`,
+        priority: "medium",
+        client_email: user.email,
+        status: "pending"
+      }
+    ]);
+
     // Trigger Strategy Agent
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://launchai-vert.vercel.app";
     fetch(`${baseUrl}/api/strategy-agent`, {
