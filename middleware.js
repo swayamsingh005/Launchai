@@ -53,8 +53,19 @@ export async function middleware(request) {
       .eq("user_id", user.id)
       .single();
     if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
-    if (client.status === "active") return NextResponse.redirect(new URL("/client-dashboard", request.url));
-    return NextResponse.redirect(new URL("/brief", request.url));
+    if (client.status !== "active") return NextResponse.redirect(new URL("/brief", request.url));
+    // Check strategy approved
+    const { data: strategy } = await supabase
+      .from("strategies")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+    if (!strategy || strategy.status !== "approved") {
+      return NextResponse.redirect(new URL("/strategy", request.url));
+    }
+    return NextResponse.redirect(new URL("/client-dashboard", request.url));
   }
 
   // ─── ADMIN ROUTES ─────────────────────────────────
@@ -66,8 +77,8 @@ export async function middleware(request) {
         .eq("user_id", user.id)
         .single();
       if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
-      if (client.status === "active") return NextResponse.redirect(new URL("/client-dashboard", request.url));
-      return NextResponse.redirect(new URL("/brief", request.url));
+      if (client.status !== "active") return NextResponse.redirect(new URL("/brief", request.url));
+      return NextResponse.redirect(new URL("/client-dashboard", request.url));
     }
     return response;
   }
@@ -127,6 +138,21 @@ export async function middleware(request) {
       .single();
     if (!client) return NextResponse.redirect(new URL("/onboarding", request.url));
     if (client.status !== "active") return NextResponse.redirect(new URL("/strategy", request.url));
+
+    // ── Thing 4 fix: check strategy is approved ──
+    const { data: strategy } = await supabase
+      .from("strategies")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!strategy || strategy.status !== "approved") {
+      return NextResponse.redirect(new URL("/strategy", request.url));
+    }
+    // ─────────────────────────────────────────────
+
     return response;
   }
 
