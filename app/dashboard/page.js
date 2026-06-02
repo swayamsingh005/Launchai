@@ -94,11 +94,16 @@ export default function Dashboard() {
         .nav { display: flex; align-items: center; justify-content: space-between; padding: 1.1rem 2rem; background: rgba(8,6,26,0.9); border-bottom: 1px solid rgba(124,58,237,0.15); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(16px); }
         .logo { font-family: 'Bebas Neue', cursive; font-size: 1.6rem; letter-spacing: 0.05em; }
         .logo em { color: #a78bfa; font-style: normal; }
-        .nav-right { display: flex; align-items: center; gap: 1rem; }
+        .nav-right { display: flex; align-items: center; gap: 0.6rem; }
         .user-pill { display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); padding: 0.4rem 1rem; border-radius: 100px; font-size: 0.82rem; color: #9ca3af; }
         .avatar { width: 24px; height: 24px; border-radius: 50%; background: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #fff; font-weight: 600; }
-        .sign-out { background: none; border: 1px solid rgba(255,255,255,0.1); color: #6b7280; padding: 0.4rem 1rem; border-radius: 100px; font-size: 0.82rem; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s; }
-        .sign-out:hover { border-color: rgba(239,68,68,0.4); color: #ef4444; }
+        .nav-btn { background: none; border: 1px solid rgba(255,255,255,0.1); color: #6b7280; padding: 0.4rem 1rem; border-radius: 100px; font-size: 0.82rem; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s; }
+        .nav-btn:hover { border-color: rgba(167,139,250,0.4); color: #a78bfa; }
+        .nav-btn.activity { border-color: rgba(124,58,237,0.3); color: #a78bfa; }
+        .nav-btn.activity:hover { background: rgba(124,58,237,0.1); }
+        .nav-btn.admin { border-color: rgba(239,68,68,0.2); color: #f87171; }
+        .nav-btn.admin:hover { background: rgba(239,68,68,0.1); }
+        .nav-btn.signout:hover { border-color: rgba(239,68,68,0.4); color: #ef4444; }
         .content { padding: 2rem; max-width: 1200px; margin: 0 auto; }
         .greeting { margin-bottom: 2rem; }
         .greeting h1 { font-family: 'Bebas Neue', cursive; font-size: 2.2rem; letter-spacing: 0.03em; color: #fff; margin-bottom: 0.3rem; }
@@ -136,7 +141,7 @@ export default function Dashboard() {
         .client-email { font-size: 0.88rem; color: #e9d5ff; font-weight: 500; }
         .client-date { font-size: 0.75rem; color: #6b7280; margin-top: 0.15rem; }
         .client-badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 100px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; font-weight: 500; }
-        @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .agents-grid { grid-template-columns: 1fr; } .content { padding: 1.25rem; } }
+        @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .agents-grid { grid-template-columns: 1fr; } .content { padding: 1.25rem; } .nav-right { gap: 0.4rem; } }
       `}</style>
 
       <nav className="nav">
@@ -146,7 +151,9 @@ export default function Dashboard() {
             <div className="avatar">{user?.email?.[0]?.toUpperCase()}</div>
             {user?.email}
           </div>
-          <button className="sign-out" onClick={signOut}>Sign out</button>
+          <button className="nav-btn activity" onClick={() => router.push("/dashboard/activity")}>⚡ Activity</button>
+          <button className="nav-btn admin" onClick={() => router.push("/admin")}>🛡 Admin</button>
+          <button className="nav-btn signout" onClick={signOut}>Sign out</button>
         </div>
       </nav>
 
