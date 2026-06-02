@@ -24,7 +24,6 @@ export default function Dashboard() {
   }, []);
 
   const fetchDashboardData = async () => {
-    // Fetch active clients
     const { data: clients } = await supabase
       .from("clients")
       .select("*")
@@ -34,7 +33,6 @@ export default function Dashboard() {
     const activeClientsList = clients || [];
     setActiveClients(activeClientsList);
 
-    // Fetch pending founder decisions
     const { data: founderDecisions } = await supabase
       .from("founder_decisions")
       .select("*")
@@ -44,7 +42,6 @@ export default function Dashboard() {
     const pendingDecisions = founderDecisions || [];
     setDecisions(pendingDecisions);
 
-    // Set stats
     setStats({
       totalClients: activeClientsList.length,
       monthlyRevenue: activeClientsList.length * 30000,
@@ -53,11 +50,7 @@ export default function Dashboard() {
   };
 
   const handleDecision = async (id, status) => {
-    await supabase
-      .from("founder_decisions")
-      .update({ status })
-      .eq("id", id);
-    // Remove from UI
+    await supabase.from("founder_decisions").update({ status }).eq("id", id);
     setDecisions(prev => prev.filter(d => d.id !== id));
     setStats(prev => ({ ...prev, decisionsPending: prev.decisionsPending - 1 }));
   };
@@ -68,18 +61,18 @@ export default function Dashboard() {
   };
 
   const agents = [
-    { icon: "🧠", name: "Strategy Agent" },
-    { icon: "🎨", name: "Design Agent" },
-    { icon: "💻", name: "Code Agent" },
-    { icon: "📣", name: "Marketing Agent" },
-    { icon: "💰", name: "Sales Agent" },
-    { icon: "🎧", name: "Support Agent" },
-    { icon: "📊", name: "Finance Agent" },
-    { icon: "🔍", name: "Growth Agent" },
-    { icon: "📋", name: "Report Agent" },
-    { icon: "🚀", name: "Deploy Agent" },
-    { icon: "🔐", name: "Security Agent" },
-    { icon: "📬", name: "Outreach Agent" },
+    { icon: "🧠", name: "Strategy Agent", slug: "strategy" },
+    { icon: "🎨", name: "Design Agent", slug: "design" },
+    { icon: "💻", name: "Code Agent", slug: "code" },
+    { icon: "📣", name: "Marketing Agent", slug: "marketing" },
+    { icon: "💰", name: "Sales Agent", slug: "sales" },
+    { icon: "🎧", name: "Support Agent", slug: "support" },
+    { icon: "📊", name: "Finance Agent", slug: "finance" },
+    { icon: "🔍", name: "Growth Agent", slug: "growth" },
+    { icon: "📋", name: "Report Agent", slug: "report" },
+    { icon: "🚀", name: "Deploy Agent", slug: "deploy" },
+    { icon: "🔐", name: "Security Agent", slug: "security" },
+    { icon: "📬", name: "Outreach Agent", slug: "outreach" },
   ];
 
   const firstName = user?.user_metadata?.full_name?.split(" ")[0] || "Swayam";
@@ -119,7 +112,6 @@ export default function Dashboard() {
         .section-title { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #7c3aed; margin-bottom: 1rem; }
         .decisions { display: flex; flex-direction: column; gap: 0.75rem; }
         .decision { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-        .decision-left {}
         .decision-title { font-size: 0.9rem; font-weight: 500; color: #f0eeff; margin-bottom: 0.25rem; }
         .decision-desc { font-size: 0.8rem; color: #6b7280; line-height: 1.4; }
         .decision-btns { display: flex; gap: 0.5rem; flex-shrink: 0; }
@@ -130,7 +122,8 @@ export default function Dashboard() {
         .priority-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
         .agents-panel { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 1.5rem; }
         .agents-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
-        .agent-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; }
+        .agent-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .agent-row:hover { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.3); transform: translateY(-1px); }
         .agent-ico { font-size: 1rem; width: 32px; height: 32px; background: rgba(124,58,237,0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .agent-name { font-size: 0.8rem; font-weight: 500; color: #d1d5db; flex: 1; }
         .agent-status { font-size: 0.68rem; padding: 2px 7px; border-radius: 100px; background: rgba(107,114,128,0.2); color: #6b7280; border: 1px solid rgba(107,114,128,0.2); }
@@ -146,7 +139,6 @@ export default function Dashboard() {
         @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .agents-grid { grid-template-columns: 1fr; } .content { padding: 1.25rem; } }
       `}</style>
 
-      {/* NAV */}
       <nav className="nav">
         <div className="logo">Launch<em>AI</em></div>
         <div className="nav-right">
@@ -159,13 +151,11 @@ export default function Dashboard() {
       </nav>
 
       <div className="content">
-        {/* GREETING */}
         <div className="greeting">
           <h1>{greeting}, {firstName.toUpperCase()} 👋</h1>
           <p>Here's what's happening at LaunchAI today — {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
 
-        {/* STATS — REAL DATA */}
         <div className="stats-row">
           <div className="stat-card">
             <p className="stat-label">Total Clients</p>
@@ -190,7 +180,6 @@ export default function Dashboard() {
         </div>
 
         <div className="grid-2">
-          {/* DECISIONS QUEUE — REAL DATA */}
           <div>
             <p className="section-title">Decisions queue — needs your yes/no</p>
             <div className="decisions">
@@ -201,7 +190,7 @@ export default function Dashboard() {
                   <div className="decision" key={d.id}>
                     <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
                       <div className="priority-dot" style={{ background: d.priority === "high" ? "#f87171" : d.priority === "medium" ? "#fbbf24" : "#6b7280" }} />
-                      <div className="decision-left">
+                      <div>
                         <p className="decision-title">{d.title}</p>
                         <p className="decision-desc">{d.description}</p>
                         {d.client_email && <p style={{ fontSize: "0.72rem", color: "#7c3aed", marginTop: "0.3rem" }}>👤 {d.client_email}</p>}
@@ -217,13 +206,14 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* AGENTS */}
           <div>
             <p className="section-title">Your 12 AI agents</p>
             <div className="agents-panel">
               <div className="agents-grid">
                 {agents.map(a => (
-                  <div className="agent-row" key={a.name}>
+                  <div className="agent-row" key={a.name}
+                    onClick={() => router.push(`/dashboard/agents/${a.slug}`)}
+                  >
                     <div className="agent-ico">{a.icon}</div>
                     <span className="agent-name">{a.name}</span>
                     <span className="agent-status">Idle</span>
@@ -234,7 +224,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ACTIVE CLIENTS — REAL DATA */}
         <div>
           <p className="section-title">Active clients</p>
           {activeClients.length === 0 ? (
