@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ totalClients: 0, monthlyRevenue: 0, decisionsPending: 0 });
   const [decisions, setDecisions] = useState([]);
   const [activeClients, setActiveClients] = useState([]);
+  const [credits, setCredits] = useState({ monthly_limit: 500, runs_used_this_month: 0, extra_credits: 0, plan: "growth" });
+  const [buyingPack, setBuyingPack] = useState(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -18,6 +20,7 @@ export default function Dashboard() {
       if (!user) { router.push("/login"); return; }
       setUser(user);
       await fetchDashboardData();
+      await fetchCredits();
       setLoading(false);
     };
     load();
@@ -49,6 +52,17 @@ export default function Dashboard() {
     });
   };
 
+  const fetchCredits = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("clients")
+      .select("monthly_limit, runs_used_this_month, extra_credits, plan")
+      .eq("user_id", user.id)
+      .single();
+    if (data) setCredits(data);
+  };
+
   const handleDecision = async (id, status) => {
     await supabase.from("founder_decisions").update({ status }).eq("id", id);
     setDecisions(prev => prev.filter(d => d.id !== id));
@@ -58,6 +72,64 @@ export default function Dashboard() {
   const signOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
+  };
+
+  const buyCredits = async (pack) => {
+    setBuyingPack(pack);
+    try {
+      const res = await fetch("/api/create-credit-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pack }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.error || "Could not start checkout");
+        setBuyingPack(null);
+        return;
+      }
+
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: "INR",
+        name: "LaunchAI",
+        description: `${data.credits} extra agent runs`,
+        order_id: data.orderId,
+        handler: async function (response) {
+          const verifyRes = await fetch("/api/verify-credit-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyData.success) {
+            await fetchCredits();
+            alert(`${verifyData.creditsAdded} credits added! New balance: ${verifyData.newBalance} extra runs.`);
+          } else {
+            alert("Payment verification failed — contact support if amount was deducted.");
+          }
+          setBuyingPack(null);
+        },
+        modal: {
+          ondismiss: function () {
+            setBuyingPack(null);
+          },
+        },
+        theme: { color: "#7c3aed" },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error("Buy credits error:", err);
+      alert("Something went wrong — try again.");
+      setBuyingPack(null);
+    }
   };
 
   const agents = [
@@ -78,6 +150,9 @@ export default function Dashboard() {
   const firstName = user?.user_metadata?.full_name?.split(" ")[0] || "Swayam";
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const totalAvailable = credits.monthly_limit + (credits.extra_credits || 0);
+  const runsRemaining = Math.max(0, totalAvailable - (credits.runs_used_this_month || 0));
+  const usagePercent = Math.min(100, Math.round(((credits.runs_used_this_month || 0) / totalAvailable) * 100));
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#08061a", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -141,7 +216,20 @@ export default function Dashboard() {
         .client-email { font-size: 0.88rem; color: #e9d5ff; font-weight: 500; }
         .client-date { font-size: 0.75rem; color: #6b7280; margin-top: 0.15rem; }
         .client-badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 100px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; font-weight: 500; }
-        @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .agents-grid { grid-template-columns: 1fr; } .content { padding: 1.25rem; } .nav-right { gap: 0.4rem; } }
+        .credits-panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; }
+        .credits-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem; }
+        .credits-num { font-family: 'Bebas Neue', cursive; font-size: 1.6rem; color: #fff; }
+        .credits-num span { color: #a78bfa; }
+        .credits-plan { font-size: 0.75rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+        .credits-bar-track { height: 6px; background: rgba(255,255,255,0.06); border-radius: 100px; overflow: hidden; margin-bottom: 1rem; }
+        .credits-bar-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+        .pack-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+        .pack-btn { background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.25); color: #e9d5ff; padding: 0.7rem; border-radius: 12px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: all 0.2s; text-align: center; }
+        .pack-btn:hover { background: rgba(124,58,237,0.18); border-color: rgba(124,58,237,0.5); }
+        .pack-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pack-credits { font-size: 0.95rem; font-weight: 600; color: #fff; }
+        .pack-price { font-size: 0.75rem; color: #a78bfa; margin-top: 0.2rem; }
+        @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } .agents-grid { grid-template-columns: 1fr; } .content { padding: 1.25rem; } .nav-right { gap: 0.4rem; } .pack-row { grid-template-columns: 1fr; } }
       `}</style>
 
       <nav className="nav">
@@ -183,6 +271,33 @@ export default function Dashboard() {
             <p className="stat-label">Decisions Pending</p>
             <p className="stat-value">{stats.decisionsPending}</p>
             <p className="stat-sub">{stats.decisionsPending === 0 ? "All caught up!" : "Needs your review"}</p>
+          </div>
+        </div>
+
+        <div className="credits-panel">
+          <div className="credits-top">
+            <div>
+              <p className="credits-plan">{credits.plan} plan</p>
+              <p className="credits-num">{runsRemaining} <span>/ {totalAvailable} runs remaining</span></p>
+            </div>
+          </div>
+          <div className="credits-bar-track">
+            <div className="credits-bar-fill" style={{ width: `${usagePercent}%` }} />
+          </div>
+          <p className="section-title" style={{ marginBottom: "0.6rem" }}>Buy more credits</p>
+          <div className="pack-row">
+            <button className="pack-btn" disabled={buyingPack !== null} onClick={() => buyCredits("small")}>
+              <div className="pack-credits">{buyingPack === "small" ? "Processing..." : "+50 runs"}</div>
+              <div className="pack-price">₹300</div>
+            </button>
+            <button className="pack-btn" disabled={buyingPack !== null} onClick={() => buyCredits("medium")}>
+              <div className="pack-credits">{buyingPack === "medium" ? "Processing..." : "+100 runs"}</div>
+              <div className="pack-price">₹500</div>
+            </button>
+            <button className="pack-btn" disabled={buyingPack !== null} onClick={() => buyCredits("large")}>
+              <div className="pack-credits">{buyingPack === "large" ? "Processing..." : "+250 runs"}</div>
+              <div className="pack-price">₹1,000</div>
+            </button>
           </div>
         </div>
 
