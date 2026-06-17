@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Resend } from "resend";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -22,10 +23,11 @@ export async function POST(request) {
 
     const { product_name, target_audience, leads, client_id, auto_send } = await request.json();
 
-    // ─────────────────────────────────────────────────
-    // MOCK MODE — replace this block with real Claude API
-    // once Anthropic credits are added
-    // ─────────────────────────────────────────────────
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "sales");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     await new Promise(r => setTimeout(r, 2000));
 
     const emails = (leads || [
@@ -39,7 +41,6 @@ export async function POST(request) {
       body: `Hi ${lead.name},\n\nI noticed ${lead.company} is working on some exciting things.\n\nMost ${target_audience}s I talk to are spending 40+ hours/week on marketing, sales, and support — tasks that could be fully automated.\n\n${product_name} has 12 AI agents that handle all of this for you. One founder went from 0 to ₹3L MRR in 60 days using it.\n\nWould a 15-min call this week make sense?\n\nBest,\n[Founder Name]`,
       follow_up_day: 3
     }));
-    // ─────────────────────────────────────────────────
 
     const sendResults = [];
     if (auto_send && process.env.RESEND_API_KEY) {
@@ -73,7 +74,9 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, emails: savedEmails, send_results: sendResults });
+    await logUsage(supabase, user.id, client_id, "sales");
+
+    return NextResponse.json({ success: true, emails: savedEmails, send_results: sendResults, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Sales agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

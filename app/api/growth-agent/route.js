@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -21,7 +22,11 @@ export async function POST(request) {
 
     const { product_name, industry, competitors, client_id } = await request.json();
 
-    // LIVE — Tavily search works without Anthropic credits!
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "growth");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     let competitorNews = [];
     let marketTrends = [];
 
@@ -57,11 +62,6 @@ export async function POST(request) {
       }
     }
 
-    // ─────────────────────────────────────────────────
-    // MOCK MODE — replace this block with real Claude API
-    // once Anthropic credits are added
-    // (Tavily search above already works live!)
-    // ─────────────────────────────────────────────────
     await new Promise(r => setTimeout(r, 1500));
 
     const growth = {
@@ -94,7 +94,6 @@ export async function POST(request) {
       growth_score: 72,
       next_milestone: "Hit ₹1L MRR — currently at ₹30K, need 3 more clients"
     };
-    // ─────────────────────────────────────────────────
 
     const { data: savedGrowth, error } = await supabase
       .from("agent_outputs")
@@ -110,7 +109,9 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, growth: savedGrowth });
+    await logUsage(supabase, user.id, client_id, "growth");
+
+    return NextResponse.json({ success: true, growth: savedGrowth, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Growth agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

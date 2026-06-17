@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -20,14 +21,12 @@ export async function POST(request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { task, tech_stack, existing_code, client_id } = await request.json();
-    // task = what the client wants built
-    // tech_stack = their stack (Next.js, Supabase etc)
-    // existing_code = optional code snippet for context
 
-    // ─────────────────────────────────────────────────
-    // MOCK MODE — replace this block with real Claude API
-    // once Anthropic credits are added
-    // ─────────────────────────────────────────────────
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "code");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     await new Promise(r => setTimeout(r, 2000));
 
     const codeOutput = {
@@ -65,7 +64,6 @@ export default function Feature() {
       },
       estimated_time: "30-45 minutes to implement"
     };
-    // ─────────────────────────────────────────────────
 
     const { data: savedCode, error } = await supabase
       .from("agent_outputs")
@@ -81,7 +79,9 @@ export default function Feature() {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, code: savedCode });
+    await logUsage(supabase, user.id, client_id, "code");
+
+    return NextResponse.json({ success: true, code: savedCode, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Code agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

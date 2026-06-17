@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -20,6 +21,15 @@ export async function POST(request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { product_name, target_audience, industry, tone, client_id, auto_post } = await request.json();
+
+    // ─────────────────────────────────────────────────
+    // USAGE LIMIT CHECK — runs before any agent work
+    // ─────────────────────────────────────────────────
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "marketing");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+    // ─────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────
     // MOCK MODE — replace this block with real Claude API
@@ -51,7 +61,6 @@ export async function POST(request) {
     };
     // ─────────────────────────────────────────────────
 
-    // AUTO POST via Buffer API if client approved
     if (auto_post && process.env.BUFFER_ACCESS_TOKEN) {
       try {
         const profilesRes = await fetch("https://api.bufferapp.com/1/profiles.json", {
@@ -92,7 +101,13 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, content: savedContent });
+    // ─────────────────────────────────────────────────
+    // LOG USAGE — runs after successful completion
+    // ─────────────────────────────────────────────────
+    await logUsage(supabase, user.id, client_id, "marketing");
+    // ─────────────────────────────────────────────────
+
+    return NextResponse.json({ success: true, content: savedContent, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Marketing agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

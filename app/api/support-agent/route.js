@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -21,10 +22,11 @@ export async function POST(request) {
 
     const { question, product_info, client_id } = await request.json();
 
-    // ─────────────────────────────────────────────────
-    // MOCK MODE — replace this block with real Claude API
-    // once Anthropic credits are added
-    // ─────────────────────────────────────────────────
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "support");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     await new Promise(r => setTimeout(r, 1500));
 
     const response = {
@@ -34,7 +36,6 @@ export async function POST(request) {
       escalate_to_founder: false,
       suggested_faq_addition: question.length > 20 ? question : null
     };
-    // ─────────────────────────────────────────────────
 
     const { data: savedResponse, error } = await supabase
       .from("agent_outputs")
@@ -50,7 +51,9 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, response: savedResponse });
+    await logUsage(supabase, user.id, client_id, "support");
+
+    return NextResponse.json({ success: true, response: savedResponse, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Support agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

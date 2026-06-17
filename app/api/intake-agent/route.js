@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -21,11 +22,16 @@ export async function POST(request) {
 
     const { idea, target_audience, goal, client_id } = await request.json();
 
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "strategy");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     // ─────────────────────────────────────────────────
     // MOCK MODE — replace this block with real Claude API
     // once Anthropic credits are added
     // ─────────────────────────────────────────────────
-    await new Promise(r => setTimeout(r, 2000)); // simulate AI thinking
+    await new Promise(r => setTimeout(r, 2000));
 
     const brief = {
       product_name: "IdeaLaunch",
@@ -57,7 +63,9 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, brief: savedBrief });
+    await logUsage(supabase, user.id, client_id, "strategy");
+
+    return NextResponse.json({ success: true, brief: savedBrief, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Intake agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -19,73 +20,50 @@ export async function POST(request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { client_id, feedback } = await request.json();
+    const { idea, target_audience, goal, client_id } = await request.json();
 
-    // Get client brief
-    const { data: brief } = await supabase
-      .from("briefs")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    const { data: client } = await supabase
-      .from("clients")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!brief || !client) {
-      return NextResponse.json({ error: "Brief or client not found" }, { status: 404 });
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "strategy");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
     }
 
     // ─────────────────────────────────────────────────
-    // MOCK MODE — replace with real Claude API once credits added
+    // MOCK MODE — replace this block with real Claude API
+    // once Anthropic credits are added
     // ─────────────────────────────────────────────────
-    await new Promise(r => setTimeout(r, 2500));
+    await new Promise(r => setTimeout(r, 2000));
 
     const strategy = {
-      launch_plan: `Start by building a minimal version of ${brief.product_name} with just the core feature: ${(brief.features || [])[0] || "the main feature"}. Launch to 10 beta users in week 1, gather feedback, iterate in week 2, then do a public launch in week 3 with a waitlist campaign.`,
-      pricing_strategy: `Start with a freemium model — free tier with basic features, paid tier at ₹499/month. This lowers the barrier to entry and helps you get your first 50 users fast. Once you have traction, raise pricing to ₹999/month.`,
-      marketing_channels: [
-        "Instagram Reels — post 1 short demo video daily showing the product in action",
-        "LinkedIn — target professionals in your audience with case studies",
-        "WhatsApp Groups — find communities where your target customers hang out",
-        "Cold Email — personalised outreach to 20 potential customers per day",
-        "Product Hunt — launch on Day 30 for maximum visibility"
-      ],
-      weekly_roadmap: [
-        { week: "Week 1", tasks: ["Build core MVP feature", "Set up landing page", "Onboard 5 beta testers", "Daily Instagram posts"] },
-        { week: "Week 2", tasks: ["Fix bugs from beta feedback", "Add payment integration", "Start cold email campaign", "Publish 2 LinkedIn posts"] },
-        { week: "Week 3", tasks: ["Public launch", "Run first paid ad campaign", "Reach out to 50 leads", "Collect 10 reviews"] },
-        { week: "Week 4", tasks: ["Analyse metrics", "Iterate on feedback", "Scale what's working", "Prepare Product Hunt launch"] }
-      ],
-      decisions: [
-        { title: "Approve pricing strategy", description: `Start with ₹499/month freemium model as suggested by Strategy Agent. Approve to proceed?` },
-        { title: "Confirm marketing channel", description: "Strategy Agent recommends Instagram Reels as primary channel. Approve to activate Marketing Agent?" },
-        { title: "Set launch date", description: "Strategy Agent suggests launching publicly in Week 3 (21 days from now). Approve this timeline?" }
-      ]
+      thirty_day_plan: {
+        week1: "Build landing page, set up payments, finalize pricing",
+        week2: "Launch on social media, start cold outreach to first 50 leads",
+        week3: "Onboard first 5 customers, collect feedback, fix issues",
+        week4: "Scale marketing, hit 10 paying customers, plan next month"
+      },
+      pricing_strategy: `Start at a price ${target_audience} won't hesitate on. Offer a discount for early adopters.`,
+      target_audience_breakdown: target_audience,
+      key_metrics_to_track: ["Signups", "Conversion rate", "Revenue", "Churn"],
+      launch_goal: goal
     };
     // ─────────────────────────────────────────────────
 
-    // Delete old strategy if regenerating
-    await supabase.from("strategies").delete().eq("user_id", user.id);
-
     const { data: savedStrategy, error } = await supabase
-      .from("strategies")
+      .from("agent_outputs")
       .insert([{
         user_id: user.id,
-        client_id: client_id || client.id,
-        ...strategy,
-        status: "pending"
+        client_id,
+        agent: "strategy",
+        output: strategy,
+        status: "completed"
       }])
       .select()
       .single();
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, strategy: savedStrategy });
+    await logUsage(supabase, user.id, client_id, "strategy");
+
+    return NextResponse.json({ success: true, strategy: savedStrategy, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Strategy agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

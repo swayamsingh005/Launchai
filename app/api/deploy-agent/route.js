@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -21,10 +22,11 @@ export async function POST(request) {
 
     const { code_snippet, description, tech_stack, client_id } = await request.json();
 
-    // ─────────────────────────────────────────────────
-    // MOCK MODE — replace this block with real Claude API
-    // once Anthropic credits are added
-    // ─────────────────────────────────────────────────
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "deploy");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     await new Promise(r => setTimeout(r, 2000));
 
     const deployReview = {
@@ -46,7 +48,6 @@ export async function POST(request) {
       estimated_deploy_time: "2-3 minutes",
       rollback_plan: "Go to Vercel dashboard → Deployments → click previous deployment → Redeploy"
     };
-    // ─────────────────────────────────────────────────
 
     const { data: savedDeploy, error } = await supabase
       .from("agent_outputs")
@@ -62,7 +63,9 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, deploy: savedDeploy });
+    await logUsage(supabase, user.id, client_id, "deploy");
+
+    return NextResponse.json({ success: true, deploy: savedDeploy, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Deploy agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

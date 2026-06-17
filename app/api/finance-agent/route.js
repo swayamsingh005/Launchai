@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { checkUsageLimit, logUsage, limitReachedResponse } from "../../../lib/usage-limits";
 
 export async function POST(request) {
   try {
@@ -21,7 +22,11 @@ export async function POST(request) {
 
     const { client_id, month } = await request.json();
 
-    // LIVE — Razorpay works without Anthropic credits!
+    const limitCheck = await checkUsageLimit(supabase, user.id, client_id, "finance");
+    if (!limitCheck.allowed) {
+      return limitReachedResponse(limitCheck.message, limitCheck.plan);
+    }
+
     let razorpayPayments = [];
     if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
       try {
@@ -43,13 +48,6 @@ export async function POST(request) {
     const totalRevenue = captured.reduce((sum, p) => sum + p.amount, 0) / 100;
     const refunded = razorpayPayments.filter(p => p.status === "refunded");
     const totalRefunds = refunded.reduce((sum, p) => sum + p.amount, 0) / 100;
-
-    // ─────────────────────────────────────────────────
-    // MOCK MODE — replace this block with real Claude API
-    // once Anthropic credits are added
-    // (Razorpay data above already works live!)
-    // ─────────────────────────────────────────────────
-    await new Promise(r => setTimeout(r, 1500));
 
     const finance = {
       month: month || new Date().toLocaleString("default", { month: "long", year: "numeric" }),
@@ -78,7 +76,6 @@ export async function POST(request) {
       flags: totalRevenue < 10000 ? ["⚠️ Low revenue this month — follow up with pending clients"] : [],
       summary: `This month LaunchAI earned ₹${(totalRevenue || 30000).toLocaleString("en-IN")} with expenses of ₹5,000 — net profit of ₹${((totalRevenue || 30000) - 5000).toLocaleString("en-IN")}. ${totalRevenue > 30000 ? "Strong month! 📈" : "On track. Keep pushing. 💪"}`
     };
-    // ─────────────────────────────────────────────────
 
     const { data: savedFinance, error } = await supabase
       .from("agent_outputs")
@@ -94,7 +91,9 @@ export async function POST(request) {
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, finance: savedFinance });
+    await logUsage(supabase, user.id, client_id, "finance");
+
+    return NextResponse.json({ success: true, finance: savedFinance, runsRemaining: limitCheck.remaining - 1 });
   } catch (err) {
     console.error("Finance agent error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
